@@ -27,3 +27,4 @@ variable "name" {
   type        = string
   default     = "terraform-ec2-freetier"
 }
+

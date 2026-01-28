@@ -1,0 +1,76 @@
+name: Terraform Import State
+
+on:
+  workflow_dispatch:
+    inputs:
+      name_tag:
+        description: 'Value of the `Name` tag used when creating resources'
+        required: false
+        default: 'terraform-ec2-free-tier'
+      run_destroy:
+        description: 'If true, run terraform destroy after importing'
+        required: false
+        default: 'false'
+
+jobs:
+  import:
+    name: Import existing resources into Terraform state
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.AWS_ROLE_NAME }}
+          aws-region: ${{ secrets.BACKEND_REGION || 'us-east-1' }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init -input=false
+
+      - name: Discover resources by tag
+        id: discover
+        run: |
+          set -e
+          TAG="${{ github.event.inputs.name_tag }}"
+          echo "Looking for EC2 instance with Name tag = $TAG"
+          INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=$TAG" --query "Reservations[].Instances[?State.Name!='terminated'].InstanceId" --output text | awk '{print $1}') || true
+          echo "Found instance: $INSTANCE_ID"
+          SG_NAME="${TAG}-sg"
+          SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=$SG_NAME" --query "SecurityGroups[0].GroupId" --output text) || true
+          echo "Found sg: $SG_ID"
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+          echo "sg_id=$SG_ID" >> $GITHUB_OUTPUT
+
+      - name: Import security group
+        if: steps.discover.outputs.sg_id != ''
+        working-directory: terraform
+        run: terraform import aws_security_group.web ${{ steps.discover.outputs.sg_id }}
+
+      - name: Import instance
+        if: steps.discover.outputs.instance_id != ''
+        working-directory: terraform
+        run: terraform import aws_instance.web ${{ steps.discover.outputs.instance_id }}
+
+      - name: Terraform Plan (after import)
+        working-directory: terraform
+        run: |
+          terraform plan -detailed-exitcode -input=false || true
+
+      - name: Optional destroy
+        if: ${{ github.event.inputs.run_destroy == 'true' }}
+        working-directory: terraform
+        env:
+          TF_VAR_public_key_path: ${{ secrets.PUBLIC_KEY_PATH }}
+        run: |
+          terraform plan -destroy -detailed-exitcode -input=false || true
+          terraform destroy -auto-approve -input=false
