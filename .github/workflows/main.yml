@@ -29,9 +29,30 @@ jobs:
         working-directory: terraform
         run: terraform init -input=false
 
+      - name: Terraform Plan
+        id: plan
+        working-directory: terraform
+        run: |
+          set -e
+          terraform plan -detailed-exitcode -out=plan.tfplan -input=false || true
+          rc=$?
+          if [ "$rc" -eq 0 ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          elif [ "$rc" -eq 2 ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "Terraform plan failed with exit code $rc"
+            exit $rc
+          fi
+
+      - name: Skip Apply if no changes
+        if: steps.plan.outputs.has_changes == 'false'
+        run: echo "No infrastructure changes detected; skipping terraform apply."
+
       - name: Terraform Apply
+        if: steps.plan.outputs.has_changes == 'true'
         working-directory: terraform
         env:
           TF_VAR_public_key_path: ${{ secrets.PUBLIC_KEY_PATH }}
-        run: terraform apply -auto-approve -input=false
+        run: terraform apply -input=false -auto-approve plan.tfplan
 
