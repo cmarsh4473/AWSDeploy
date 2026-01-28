@@ -6,14 +6,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  assume-role-and-test:
-    name: Configure AWS via OIDC and test
+  terraform-deploy:
+    name: Run Terraform to provision EC2
     runs-on: ubuntu-latest
-    # Required permissions for OIDC and for checkout content read
     permissions:
       id-token: write
       contents: read
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,22 +19,19 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          # Either put the full role ARN here, or store ACCOUNT ID + ROLE NAME in repo secrets and build the ARN
-          # Example using a secret that contains the full role ARN:
-          # role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          #
-          # OR using account + role name stored in secrets:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.AWS_ROLE_NAME }}
-          # role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
 
-      - name: Verify identity (aws sts get-caller-identity)
-        run: |
-          aws sts get-caller-identity
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
 
-      # Add deployment/build steps below that require AWS credentials.
-      # Example: build + push to ECR, or deploy CloudFormation, etc.
-      # - name: Build and push image
-      #   run: |
-      #     docker build -t my-image:latest .
-      #     ...
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init -input=false
+
+      - name: Terraform Apply
+        working-directory: terraform
+        env:
+          TF_VAR_public_key_path: ${{ secrets.PUBLIC_KEY_PATH }}
+        run: terraform apply -auto-approve -input=false
+
