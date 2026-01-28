@@ -25,5 +25,5 @@ variable "ssh_cidr" {
 variable "name" {
   description = "Name prefix for resources"
   type        = string
-  default     = "terraform-ec2-free-tier"
+  default     = "terraform-ec2-freetier"
 }
