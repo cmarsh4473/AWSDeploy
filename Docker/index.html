@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Welcome — SPA</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#f7fafc;color:#0f172a;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+    .card{background:white;padding:2rem;border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,0.08);text-align:center}
+    button{margin-top:1rem;padding:0.5rem 1rem;border:none;background:#2563eb;color:#fff;border-radius:8px;cursor:pointer}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Welcome</h1>
+    <p>This is a minimal single-page app (SPA) welcome page.</p>
+    <button id="greet">Click me</button>
+    <p id="msg" style="margin-top:.8rem;color:#334155"></p>
+  </div>
+  <script>
+    document.getElementById('greet').addEventListener('click', ()=> {
+      document.getElementById('msg').textContent = 'Hello — your SPA is running!';
+    });
+  </script>
+</body>
+</html>
