@@ -1,0 +1,10 @@
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+.terraform.lock.hcl
+__pycache__/
+*.pyc
+/.idea/
+.env
+.aws/
+*.log

@@ -1,19 +1,11 @@
-output "instance_id" {
-  description = "The EC2 instance ID"
-  value       = aws_instance.web.id
+output "api_endpoint" {
+  value = aws_apigatewayv2_api.http_api.api_endpoint
 }
 
-output "public_ip" {
-  description = "Public IPv4 address of the instance"
-  value       = aws_instance.web.public_ip
+output "ecr_repo_url" {
+  value = aws_ecr_repository.lambda_repo.repository_url
 }
 
-output "public_dns" {
-  description = "Public DNS name of the instance"
-  value       = aws_instance.web.public_dns
-}
-
-output "ssh_command" {
-  description = "Example SSH command (replace private key path if needed)"
-  value       = var.public_key_path != "" ? "ssh -i <path-to-private-key-for-your-public-key> ec2-user@${aws_instance.web.public_ip}" : "ssh ec2-user@${aws_instance.web.public_ip} (no key created by Terraform)"
+output "lambda_arn" {
+  value = aws_lambda_function.container_lambda.arn
 }

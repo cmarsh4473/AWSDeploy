@@ -1,0 +1,83 @@
+name: Terraform CI (plan/apply/destroy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'terraform action: plan | apply | destroy'
+        required: true
+        default: 'plan'
+      auto_approve:
+        description: 'Skip approval for apply/destroy'
+        required: false
+        default: 'false'
+
+env:
+  TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+  TF_STATE_DYNAMODB: ${{ secrets.TF_STATE_DYNAMODB }}
+  TF_STATE_KEY: terraform.tfstate
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (assume role via OIDC)
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_NAME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Backend Existence Check
+        run: |
+          set -e
+          aws s3api head-bucket --bucket $TF_STATE_BUCKET
+          aws dynamodb describe-table --table-name $TF_STATE_DYNAMODB
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform init with remote backend
+        working-directory: ./terraform
+        run: |
+          terraform init -reconfigure \
+            -backend-config="bucket=$TF_STATE_BUCKET" \
+            -backend-config="key=$TF_STATE_KEY" \
+            -backend-config="region=$AWS_REGION" \
+            -backend-config="dynamodb_table=$TF_STATE_DYNAMODB"
+
+      - name: Terraform fmt
+        working-directory: ./terraform
+        run: terraform fmt -check || true
+
+      - name: Terraform validate
+        working-directory: ./terraform
+        run: terraform validate || true
+
+      - name: Terraform plan/apply/destroy
+        working-directory: ./terraform
+        env:
+          TF_VAR_aws_profile: ''
+        run: |
+          if [ "${{ github.event.inputs.action }}" = "plan" ]; then
+            terraform plan -out=plan.out
+          elif [ "${{ github.event.inputs.action }}" = "apply" ]; then
+            if [ "${{ github.event.inputs.auto_approve }}" = "true" ]; then
+              terraform apply -auto-approve
+            else
+              terraform apply
+            fi
+          elif [ "${{ github.event.inputs.action }}" = "destroy" ]; then
+            if [ "${{ github.event.inputs.auto_approve }}" = "true" ]; then
+              terraform destroy -auto-approve
+            else
+              terraform destroy
+            fi
+          else
+            echo "Unknown action: ${{ github.event.inputs.action }}"; exit 1
+          fi
