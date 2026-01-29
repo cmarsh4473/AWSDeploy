@@ -31,7 +31,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_NAME }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Precondition check: backend exists
+      - name: Backend Existence Check
         run: |
           set -e
           aws s3api head-bucket --bucket $TF_STATE_BUCKET
