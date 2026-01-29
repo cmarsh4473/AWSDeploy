@@ -1,19 +1,19 @@
-output "instance_id" {
-  description = "The EC2 instance ID"
-  value       = aws_instance.web.id
+output "api_endpoint" {
+  description = "HTTP API endpoint URL"
+  value       = aws_apigatewayv2_api.http.api_endpoint
 }
 
-output "public_ip" {
-  description = "Public IPv4 address of the instance"
-  value       = aws_instance.web.public_ip
+output "lambda_function_name" {
+  description = "Name of the Lambda function"
+  value       = aws_lambda_function.app.function_name
 }
 
-output "public_dns" {
-  description = "Public DNS name of the instance"
-  value       = aws_instance.web.public_dns
+output "ecr_repository_url" {
+  description = "ECR repository URL"
+  value       = aws_ecr_repository.app.repository_url
 }
 
-output "ssh_command" {
-  description = "Example SSH command (replace private key path if needed)"
-  value       = var.public_key_path != "" ? "ssh -i <path-to-private-key-for-your-public-key> ec2-user@${aws_instance.web.public_ip}" : "ssh ec2-user@${aws_instance.web.public_ip} (no key created by Terraform)"
+output "log_group" {
+  description = "CloudWatch Log Group for the Lambda"
+  value       = aws_cloudwatch_log_group.lambda.name
 }

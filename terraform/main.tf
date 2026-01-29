@@ -1,80 +1,87 @@
-data "aws_ami" "amazon_linux" {
-  most_recent = true
-  owners       = ["amazon"]
-
-  filter {
-    name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
-  }
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/lambda_src"
+  output_path = "${path.module}/lambda/lambda_function.zip"
 }
 
-resource "aws_security_group" "web" {
-  name        = "${var.name}-sg"
-  description = "Allow SSH and HTTP"
-
-  ingress {
-    description      = "SSH"
-    from_port        = 22
-    to_port          = 22
-    protocol         = "tcp"
-    cidr_blocks      = [var.ssh_cidr]
-  }
-
-  ingress {
-    description = "HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+resource "aws_ecr_repository" "app" {
+  name                 = "${var.name}-repo"
+  image_tag_mutability = "MUTABLE"
 
   tags = {
-    Name = "${var.name}-sg"
+    Name = "${var.name}-repo"
   }
 }
 
-resource "aws_key_pair" "deployer" {
-  count      = var.public_key_path != "" ? 1 : 0
-  key_name   = "${var.name}-key"
-  public_key = file(var.public_key_path)
+resource "aws_iam_role" "lambda_exec" {
+  name = "${var.name}-lambda-role"
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
 }
 
-locals {
-  key_name = length(aws_key_pair.deployer) > 0 ? aws_key_pair.deployer[0].key_name : null
+resource "aws_iam_role_policy_attachment" "lambda_basic" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-resource "aws_instance" "web" {
-  ami                    = data.aws_ami.amazon_linux.id
-  instance_type          = var.instance_type
-  key_name               = local.key_name
-  vpc_security_group_ids = [aws_security_group.web.id]
+resource "aws_lambda_function" "app" {
+  function_name = "${var.name}-lambda"
+  filename      = data.archive_file.lambda_zip.output_path
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  role          = aws_iam_role.lambda_exec.arn
+  handler       = "lambda_function.lambda_handler"
+  runtime       = "python3.9"
 
-  tags = {
-    Name = var.name
-  }
+  depends_on = [aws_iam_role_policy_attachment.lambda_basic]
+}
 
-  user_data = <<-EOF
-              #!/bin/bash
-              yum update -y
+resource "aws_cloudwatch_log_group" "lambda" {
+  name              = "/aws/lambda/${aws_lambda_function.app.function_name}"
+  retention_in_days = var.log_retention_days
+}
 
-              # Install Docker
-              amazon-linux-extras install -y docker
-              systemctl enable docker
-              systemctl start docker
+resource "aws_apigatewayv2_api" "http" {
+  name          = "${var.name}-api"
+  protocol_type = "HTTP"
+}
 
-              # Allow ec2-user to run docker without sudo
-              usermod -aG docker ec2-user
+resource "aws_apigatewayv2_integration" "lambda" {
+  api_id                = aws_apigatewayv2_api.http.id
+  integration_type      = "AWS_PROXY"
+  integration_uri       = aws_lambda_function.app.invoke_arn
+  payload_format_version = "2.0"
+}
 
-              # Pull and run a simple nginx container to serve a welcome page
-              docker pull nginx:stable
-              docker run --name welcome -d -p 80:80 --restart unless-stopped nginx:stable
+resource "aws_apigatewayv2_route" "default" {
+  api_id   = aws_apigatewayv2_api.http.id
+  route_key = "GET /"
+  target   = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
 
-              EOF
+resource "aws_apigatewayv2_stage" "default" {
+  api_id     = aws_apigatewayv2_api.http.id
+  name       = "$default"
+  auto_deploy = true
+}
+
+resource "aws_lambda_permission" "apigw" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.app.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.http.execution_arn}/*/*"
 }
