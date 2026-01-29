@@ -1,17 +1,17 @@
-variable "aws_region" {
-  description = "AWS region to create resources in"
+variable "region" {
+  description = "AWS region"
   type        = string
   default     = "us-east-1"
 }
-variable "name" {
-  description = "Name prefix for resources"
+
+variable "aws_profile" {
+  description = "AWS CLI profile name (optional)"
   type        = string
-  default     = "terraform-ec2-freetier"
+  default     = ""
 }
 
-variable "log_retention_days" {
-  description = "CloudWatch Logs retention (days) for the Lambda"
-  type        = number
-  default     = 1
+variable "lambda_repo_name" {
+  description = "ECR repository name for the lambda image"
+  type        = string
+  default     = "lambda-repo"
 }
-

@@ -1,6 +1,7 @@
 def lambda_handler(event, context):
+    # Simple JSON response for API Gateway HTTP API
     return {
         "statusCode": 200,
         "headers": {"Content-Type": "application/json"},
-        "body": "{\"message\": \"Hello from Terraform-managed Lambda!\"}"
+        "body": '{"message": "Hello from container Lambda!"}'
     }
