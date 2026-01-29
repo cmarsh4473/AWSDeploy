@@ -4,14 +4,6 @@ data "archive_file" "lambda_zip" {
   output_path = "${path.module}/lambda/lambda_function.zip"
 }
 
-resource "aws_ecr_repository" "app" {
-  name                 = "${var.name}-repo"
-  image_tag_mutability = "MUTABLE"
-
-  tags = {
-    Name = "${var.name}-repo"
-  }
-}
 
 resource "aws_iam_role" "lambda_exec" {
   name = "${var.name}-lambda-role"

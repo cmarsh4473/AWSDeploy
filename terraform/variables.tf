@@ -12,6 +12,6 @@ variable "name" {
 variable "log_retention_days" {
   description = "CloudWatch Logs retention (days) for the Lambda"
   type        = number
-  default     = 14
+  default     = 1
 }
 
