@@ -1,5 +1,8 @@
 name: Terraform CI (plan/apply/destroy)
-
+permissions:
+  id-token: write
+  contents: read
+  
 on:
   workflow_dispatch:
     inputs:
