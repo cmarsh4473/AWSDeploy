@@ -38,7 +38,7 @@ jobs:
       - name: Build, tag, and push image
         run: |
           IMAGE_URI=${{ steps.account.outputs.account }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_NAME }}:latest
-          docker build -t $IMAGE_URI -f lambda/Dockerfile .
+          docker build -t $IMAGE_URI -f lambda/Dockerfile lambda
           docker push $IMAGE_URI
 
       - name: Output image URI
