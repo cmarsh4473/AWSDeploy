@@ -1,8 +1,13 @@
+data "aws_caller_identity" "current" {}
+
 resource "aws_lambda_function" "container_lambda" {
   function_name = "container-lambda"
   package_type  = "Image"
   image_uri     = "356175845736.dkr.ecr.us-east-1.amazonaws.com/serveq:latest"
   role          = aws_iam_role.lambda_exec_role.arn
+
+  # Use AWS-managed KMS key for environment variable encryption
+  kms_key_arn = "arn:aws:kms:${var.region}:${data.aws_caller_identity.current.account_id}:alias/aws/lambda"
 }
 
 resource "aws_apigatewayv2_api" "http_api" {
