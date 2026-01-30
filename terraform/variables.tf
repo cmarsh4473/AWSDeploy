@@ -13,5 +13,5 @@ variable "aws_profile" {
 variable "lambda_repo_name" {
   description = "ECR repository name for the lambda image"
   type        = string
-  default     = "lambda-repo"
+  default     = "serveq"
 }
