@@ -1,7 +1,7 @@
 resource "aws_lambda_function" "container_lambda" {
   function_name = "container-lambda"
   package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.lambda_repo.repository_url}:latest"
+  image_uri     = "356175845736.dkr.ecr.us-east-1.amazonaws.com/serveq:latest"
   role          = aws_iam_role.lambda_exec_role.arn
 }
 
