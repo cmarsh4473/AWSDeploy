@@ -1,11 +1,14 @@
 name: Build and push Lambda image to ECR
+permissions:
+  id-token: write
+  contents: read
 
 on:
   workflow_dispatch: {}
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPO_NAME: lambda-repo
+  ECR_REPO_NAME: serveq
 
 jobs:
   build-and-push:
