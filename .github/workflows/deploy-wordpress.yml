@@ -1,0 +1,119 @@
+name: Deploy WordPress to AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+  TF_VERSION: 1.5.0
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="dynamodb_table=${{ secrets.TF_STATE_DYNAMODB }}" \
+            -backend-config="key=wordpress/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="encrypt=true"
+
+      - name: Create terraform.tfvars
+        working-directory: ./terraform
+        run: |
+          cat > terraform.tfvars <<'EOF'
+          region                     = "${{ secrets.AWS_REGION || 'us-east-1' }}"
+          aws_profile                = ""
+          instance_type              = "t2.micro"
+          wordpress_admin_user       = "admin"
+          wordpress_admin_password   = "${{ secrets.WORDPRESS_ADMIN_PASSWORD }}"
+          wordpress_admin_email      = "${{ secrets.WORDPRESS_ADMIN_EMAIL }}"
+          wordpress_db_password      = "${{ secrets.WORDPRESS_DB_PASSWORD }}"
+          mysql_root_password        = "${{ secrets.MYSQL_ROOT_PASSWORD }}"
+          site_name                  = "My WordPress Site"
+          enable_https               = false
+          EOF
+
+      - name: Terraform Format Check
+        working-directory: ./terraform
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        working-directory: ./terraform
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: ./terraform
+        run: terraform plan -out=tfplan -lock=false
+
+      - name: Save Plan Artifact
+        if: github.event.inputs.action == 'plan'
+        uses: actions/upload-artifact@v3
+        with:
+          name: tfplan
+          path: terraform/tfplan
+          retention-days: 5
+
+      - name: Terraform Apply
+        if: github.event.inputs.action == 'apply'
+        working-directory: ./terraform
+        run: terraform apply -auto-approve -lock=false tfplan
+        env:
+          TF_WORKSPACE: default
+
+      - name: Terraform Destroy
+        if: github.event.inputs.action == 'destroy'
+        working-directory: ./terraform
+        run: |
+          echo "Destroying WordPress infrastructure..."
+          terraform destroy -auto-approve
+        env:
+          TF_WORKSPACE: default
+
+      - name: Output Deployment Details
+        if: github.event.inputs.action == 'apply' && success()
+        working-directory: ./terraform
+        run: |
+          echo "## Deployment Complete ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### WordPress URL" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          terraform output -raw wordpress_url >> $GITHUB_STEP_SUMMARY || echo "Output not available yet"
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### SSH Connection" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          terraform output -raw ssh_command >> $GITHUB_STEP_SUMMARY || echo "Output not available yet"
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
