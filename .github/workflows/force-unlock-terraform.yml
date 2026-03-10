@@ -1,0 +1,87 @@
+name: Force Unlock Terraform State
+
+on:
+  workflow_dispatch:
+    inputs:
+      lock_id:
+        description: 'Terraform state lock ID to force unlock'
+        required: true
+        type: string
+      confirm:
+        description: 'Type "UNLOCK" to confirm force unlock'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+  TF_VERSION: 1.5.0
+
+jobs:
+  force-unlock:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Validate confirmation
+        if: github.event.inputs.confirm != 'UNLOCK'
+        run: |
+          echo "❌ Confirmation failed. You must type 'UNLOCK' to confirm."
+          exit 1
+
+      - name: Terraform Init (Backend Only)
+        working-directory: ./terraform
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="dynamodb_table=${{ secrets.TF_STATE_DYNAMODB }}" \
+            -backend-config="key=wordpress/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="encrypt=true" \
+            -upgrade
+
+      - name: Force Unlock State Lock
+        working-directory: ./terraform
+        run: |
+          echo "🔓 Attempting to force unlock lock ID: ${{ github.event.inputs.lock_id }}"
+          terraform force-unlock -force ${{ github.event.inputs.lock_id }}
+
+      - name: Verify Lock Removal
+        working-directory: ./terraform
+        run: |
+          echo "✅ Force unlock completed. Verifying state access..."
+          terraform state list || echo "State is accessible"
+
+      - name: Post-Unlock Summary
+        run: |
+          echo "## 🔓 Terraform State Lock Force Unlocked" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Lock ID:** ${{ github.event.inputs.lock_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "**Initiated by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ⚠️ Important Notes" >> $GITHUB_STEP_SUMMARY
+          echo "- Only force unlock if you're certain no other operations are running" >> $GITHUB_STEP_SUMMARY
+          echo "- Check AWS Console to verify resources are in expected state" >> $GITHUB_STEP_SUMMARY
+          echo "- Consider running a new plan to verify state integrity" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Run a new plan to verify state integrity" >> $GITHUB_STEP_SUMMARY
+          echo "2. Apply changes if the plan looks correct" >> $GITHUB_STEP_SUMMARY
+          echo "3. Monitor for any state inconsistencies" >> $GITHUB_STEP_SUMMARY

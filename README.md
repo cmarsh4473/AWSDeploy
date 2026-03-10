@@ -251,6 +251,17 @@ terraform destroy
 
 ## Troubleshooting
 
+### State Lock Issues
+If you encounter "Error acquiring the state lock" errors:
+
+1. **Check for running workflows** in GitHub Actions tab
+2. **Use the Force Unlock workflow**:
+   - Go to **Actions** → **Force Unlock Terraform State**
+   - Click **Run workflow**
+   - Enter the lock ID from the error message (e.g., `6a3b9cee-b7bf-decd-155d-b2016bea5447`)
+   - Type "UNLOCK" to confirm force unlock
+3. **Wait and retry** if you're unsure about force unlocking
+
 ### Instance takes too long to launch
 - User data script runs on first boot (2-3 minutes)
 - Check system logs: `aws ec2 get-console-output --instance-id <id>`
