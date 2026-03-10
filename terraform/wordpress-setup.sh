@@ -33,15 +33,15 @@ systemctl enable mysqld
 systemctl enable httpd
 
 # Set MySQL root password and secure installation
-mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '${mysql_root_password}';"
-mysql -u root -p"${mysql_root_password}" -e "DELETE FROM mysql.user WHERE User='';"
-mysql -u root -p"${mysql_root_password}" -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');"
-mysql -u root -p"${mysql_root_password}" -e "DROP DATABASE IF EXISTS test;"
+mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$${mysql_root_password}';"
+mysql -u root -p"$${mysql_root_password}" -e "DELETE FROM mysql.user WHERE User='';"
+mysql -u root -p"$${mysql_root_password}" -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');"
+mysql -u root -p"$${mysql_root_password}" -e "DROP DATABASE IF EXISTS test;"
 
 # Create WordPress database and user
-mysql -u root -p"${mysql_root_password}" -e "CREATE DATABASE IF NOT EXISTS wordpress DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-mysql -u root -p"${mysql_root_password}" -e "CREATE USER IF NOT EXISTS 'wordpress'@'localhost' IDENTIFIED BY '${wordpress_db_password}'; FLUSH PRIVILEGES;"
-mysql -u root -p"${mysql_root_password}" -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'wordpress'@'localhost'; FLUSH PRIVILEGES;"
+mysql -u root -p"$${mysql_root_password}" -e "CREATE DATABASE IF NOT EXISTS wordpress DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+mysql -u root -p"$${mysql_root_password}" -e "CREATE USER IF NOT EXISTS 'wordpress'@'localhost' IDENTIFIED BY '$${wordpress_db_password}'; FLUSH PRIVILEGES;"
+mysql -u root -p"$${mysql_root_password}" -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'wordpress'@'localhost'; FLUSH PRIVILEGES;"
 
 # Download WordPress
 cd /tmp
@@ -60,7 +60,7 @@ SALT=$(curl -s https://api.wordpress.org/secret-key/1.1/salt/)
 # Update wp-config.php with database credentials
 sed -i "s/define( 'DB_NAME', 'database_name_here' );/define( 'DB_NAME', 'wordpress' );/" wp-config.php
 sed -i "s/define( 'DB_USER', 'username_here' );/define( 'DB_USER', 'wordpress' );/" wp-config.php
-sed -i "s/define( 'DB_PASSWORD', 'password_here' );/define( 'DB_PASSWORD', '${wordpress_db_password}' );/" wp-config.php
+sed -i "s/define( 'DB_PASSWORD', 'password_here' );/define( 'DB_PASSWORD', '$${wordpress_db_password}' );/" wp-config.php
 sed -i "s/define( 'DB_HOST', 'localhost' );/define( 'DB_HOST', 'localhost' );/" wp-config.php
 
 # Replace salt keys
@@ -88,7 +88,7 @@ sed -i '/<Directory "\/var\/www\/html">/,/<\/Directory>/s/AllowOverride None/All
 systemctl restart httpd
 
 # Optional: Setup self-signed SSL certificate for HTTPS
-if [ "${enable_https}" = "yes" ]; then
+if [ "$${enable_https}" = "yes" ]; then
     yum install -y mod_ssl openssl
     
     # Generate self-signed certificate
@@ -125,10 +125,10 @@ fi
 if command -v wp &> /dev/null; then
     wp core install \
         --url="http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)" \
-        --title="${site_name}" \
-        --admin_user="${wordpress_admin_user}" \
-        --admin_password="${wordpress_admin_password}" \
-        --admin_email="${wordpress_admin_email}" \
+        --title="$${site_name}" \
+        --admin_user="$${wordpress_admin_user}" \
+        --admin_password="$${wordpress_admin_password}" \
+        --admin_email="$${wordpress_admin_email}" \
         --allow-root
 else
     # WordPress will show setup wizard on first visit
