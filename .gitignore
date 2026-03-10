@@ -8,3 +8,8 @@ __pycache__/
 .env
 .aws/
 *.log
+terraform.tfvars.example
+deploy.sh
+DEPLOYMENT_GUIDE.md
+GITHUB_SECRETS_SETUP.md
+TERRAFORM_BACKEND.md
